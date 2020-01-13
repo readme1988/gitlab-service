@@ -6,11 +6,13 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.google.gson.Gson;
+
 import io.choerodon.core.exception.FeignException;
 import io.choerodon.gitlab.api.vo.MemberVO;
 import io.choerodon.gitlab.api.vo.VariableVO;
 import io.choerodon.gitlab.app.service.ProjectService;
 import io.choerodon.gitlab.infra.common.client.Gitlab4jClient;
+
 import org.gitlab4j.api.GitLabApi;
 import org.gitlab4j.api.GitLabApiException;
 import org.gitlab4j.api.models.*;
@@ -46,6 +48,8 @@ public class ProjectServiceImpl implements ProjectService {
             project.setPublic(true);
             return gitLabApi.getProjectApi().updateProject(project);
         } catch (GitLabApiException e) {
+            LOGGER.info("groupId:{},projectName:{},userId:{},visibility:{}", groupId, projectName, userId, visibility);
+            LOGGER.info("{}", e.getMessage());
             throw new FeignException(e.getMessage(), e);
         }
     }
@@ -91,7 +95,7 @@ public class ProjectServiceImpl implements ProjectService {
         try {
             return gitlab4jclient.getGitLabApi().getProjectApi().getProject(projectId);
         } catch (GitLabApiException e) {
-            if(e.getHttpStatus() == 404) {
+            if (e.getHttpStatus() == 404) {
                 return new Project();
             }
             throw new FeignException(e.getMessage(), e);
@@ -101,7 +105,10 @@ public class ProjectServiceImpl implements ProjectService {
     @Override
     public Project getProject(Integer userId, String groupCode, String projectCode) {
         try {
-            return gitlab4jclient.getGitLabApi(userId).getProjectApi().getProject(groupCode, projectCode);
+            String targetPathWithNamespace = groupCode + "/" + projectCode;
+            return gitlab4jclient.getGitLabApi(userId).getProjectApi().getProjects(projectCode).stream()
+                    .filter(i -> i.getPathWithNamespace().equals(targetPathWithNamespace))
+                    .findFirst().orElse(new Project());
         } catch (GitLabApiException e) {
             if (e.getHttpStatus() == 404) {
                 return new Project();
